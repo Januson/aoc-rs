@@ -1,6 +1,7 @@
 use std::ops::Range;
 use std::iter::FromIterator;
 use crate::util::duplicates::DuplicateIterator;
+use crate::util::accumulate::AccumulateIterator;
 
 struct StringRange {
     origin: String,
@@ -62,6 +63,67 @@ impl Password {
     }
 }
 
+trait Validation {
+    fn is_valid(&self, password: u64) -> bool;
+}
+
+struct NeverDecreases;
+
+impl NeverDecreases {
+    fn new() -> NeverDecreases {
+        NeverDecreases {}
+    }
+}
+
+impl Validation for NeverDecreases {
+    fn is_valid(&self, password: u64) -> bool {
+        let mut chars: Vec<char> = password.to_string().chars().collect();
+        chars.sort();
+        let pass = String::from_iter(chars);
+        pass == password.to_string()
+    }
+}
+
+struct ContainsRepeat;
+
+impl ContainsRepeat {
+    fn new() -> ContainsRepeat {
+        ContainsRepeat {}
+    }
+}
+
+impl Validation for ContainsRepeat {
+    fn is_valid(&self, password: u64) -> bool {
+        password.to_string().chars()
+            .duplicates()
+            .peekable()
+            .peek()
+            .is_some()
+    }
+}
+
+struct LimitRepeat {
+    limit: u8,
+}
+
+impl LimitRepeat {
+    fn new(limit: u8) -> LimitRepeat {
+        LimitRepeat {
+            limit
+        }
+    }
+}
+
+impl Validation for LimitRepeat {
+    fn is_valid(&self, password: u64) -> bool {
+        password.to_string().chars()
+            .duplicates()
+            .peekable()
+            .peek()
+            .is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -77,17 +139,17 @@ mod tests {
 
     #[test]
     fn password_must_have_repeating_digit() {
-        assert_eq!(false, Password::new(123).is_valid());
+        assert_eq!(false, ContainsRepeat::new().is_valid(123));
     }
 
     #[test]
     fn password_must_be_increasing() {
-        assert!(Password::new(1123).never_decreases());
+        assert!(NeverDecreases::new().is_valid(1123));
     }
 
     #[test]
     fn decreasing_password_is_rejected() {
-        assert!(!Password::new(11231).never_decreases());
+        assert_eq!(false, NeverDecreases::new().is_valid(11231));
     }
 
     #[test]
