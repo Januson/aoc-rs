@@ -48,6 +48,22 @@ impl Game {
         }
         true
     }
+
+    fn fewest(&self) -> (Color, Color, Color) {
+        let (red, green, blue) = &self.draws.iter()
+            .fold((0, 0, 0), |a, b| (a.0.max(b.red), a.1.max(b.green), a.2.max(b.blue)));
+
+        (Red(*red), Green(*green), Blue(*blue))
+    }
+
+    fn fewest_power(&self) -> u32 {
+        if let (Red(red), Green(green), Blue(blue)) = &self.fewest() {
+            return 1u32 * *red as u32 * *green as u32 * *blue as u32
+        }
+
+        // Should be unreachable
+        panic!("Error")
+    }
 }
 
 impl FromStr for Game {
@@ -71,28 +87,34 @@ impl FromStr for Game {
 
 #[derive(Debug)]
 struct Draw {
-    stones: Vec<Color>,
+    red: u8,
+    green: u8,
+    blue: u8,
 }
 
 impl Draw {
     fn new(stones: Vec<Color>) -> Self {
-        Draw { stones }
-    }
+        let mut draw = Draw {
+            red: 0,
+            green: 0,
+            blue: 0,
+        };
 
-    fn is_possible(&self, red: u8, green: u8, blue: u8) -> bool {
-        for stone in &self.stones {
-            let possible = match stone {
-                Red(n) => n <= &red,
-                Green(n) => n <= &green,
-                Blue(n) => n <= &blue,
-            }            ;
-
-            if !possible {
-                return false;
+        for stone in stones {
+            match stone {
+                Red(n) => draw.red = n,
+                Green(n) => draw.green = n,
+                Blue(n) => draw.blue = n,
             }
         }
 
-        true
+        draw
+    }
+
+    fn is_possible(&self, red: u8, green: u8, blue: u8) -> bool {
+        self.red <= red &&
+            self.green <= green &&
+            self.blue <= blue
     }
 }
 
@@ -125,6 +147,17 @@ mod tests {
     }
 
     #[test]
+    fn second_part() {
+        let input = include_str!("../../input/day_02/input.txt");
+        let total = input.lines().into_iter()
+            .map(|line| Game::from_str(line).unwrap())
+            .map(|game| game.fewest_power())
+            .sum::<u32>();
+
+        assert_eq!(total, 84538);
+    }
+
+    #[test]
     fn game_possibility() {
         let draws = vec![
             Draw::new(vec![Red(0), Green(0), Blue(0)]),
@@ -148,7 +181,9 @@ mod tests {
     #[test]
     fn draw_parsing() {
         let draw = Draw::from_str(" 3 red, 4 green, 16 blue").unwrap();
-        assert_eq!(vec![Red(3), Green(4), Blue(16)], draw.stones);
+        assert_eq!(3, draw.red);
+        assert_eq!(4, draw.green);
+        assert_eq!(16, draw.blue);
     }
 
     #[test]
@@ -157,7 +192,21 @@ mod tests {
 
         assert_eq!(3, game.id);
         assert_eq!(3, game.draws.len());
-        assert_eq!(vec![Green(5), Red(1)], game.draws[2].stones);
+        assert_eq!(1, game.draws[2].red);
+        assert_eq!(5, game.draws[2].green);
+        assert_eq!(0, game.draws[2].blue);
+    }
+
+    #[test]
+    fn counting_fewest() {
+        let game = Game::new(1, vec![
+            Draw::new(vec![Red(1), Green(2), Blue(3)]),
+            Draw::new(vec![Red(3), Green(2), Blue(1)]),
+            Draw::new(vec![Green(3)])
+        ]);
+
+        assert_eq!((Red(3), Green(3), Blue(3)), game.fewest());
+        assert_eq!(27, game.fewest_power());
     }
 
 }
