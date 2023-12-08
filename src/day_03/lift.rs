@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ impl Number {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 struct Point {
     x: usize,
     y: usize,
@@ -60,13 +61,24 @@ impl Point {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+struct Gear(u32, u32);
+
+impl Gear {
+    fn ratio(&self) -> u32 {
+        self.0 * self.1
+    }
+}
+
 struct Schematic {
     plan: Vec<Vec<char>>,
 }
 
 impl Schematic {
     fn new(plan: Vec<Vec<char>>) -> Self {
-        Schematic { plan }
+        Schematic {
+            plan,
+        }
     }
 
     fn part_numbers(&self) -> Vec<u32> {
@@ -78,10 +90,34 @@ impl Schematic {
             .collect()
     }
 
+    fn gears(&self) -> Vec<Gear> {
+        let all_numbers = self.all_numbers();
+        let mut gears: HashMap<Point, Vec<&Number >> = HashMap::new();
+
+        all_numbers.iter()
+            .for_each(|number| self.add_gears(&mut gears, number));
+
+        gears.values().into_iter()
+            .filter(|numbers| numbers.len() == 2)
+            .map(|numbers| Gear(numbers[0].to_number(), numbers[1].to_number()))
+            .collect()
+    }
+
+    fn add_gears<'a>(&self, gears: &mut HashMap<Point, Vec<&'a Number>>, number: &'a Number) {
+        for neighbour in number.neighbours() {
+            if neighbour.y >= self.plan.len() { continue; }
+            if neighbour.x >= self.plan[0].len() { continue; }
+            let char = &self.plan[neighbour.y][neighbour.x];
+            if *char == '*' {
+                gears.entry(neighbour).or_insert(Vec::new()).push(number);
+            }
+        }
+    }
+
     fn is_part_number(&self, number: &Number) -> bool {
         for neighbour in number.neighbours() {
-            if neighbour.y < 0 || neighbour.y >= self.plan.len() { continue; }
-            if neighbour.x < 0 || neighbour.x >= self.plan[0].len() { continue; }
+            if neighbour.y >= self.plan.len() { continue; }
+            if neighbour.x >= self.plan[0].len() { continue; }
             let char = &self.plan[neighbour.y][neighbour.x];
             if *char != '.' && !char.is_numeric() {
                 return true;
@@ -147,12 +183,23 @@ mod tests {
 
         let result = schematic.part_numbers().iter().sum::<u32>();
 
-        assert_eq!(result, 528819); // low
+        assert_eq!(528819, result);
     }
 
+    #[test]
+    fn second_part() {
+        let input = include_str!("../../input/day_03/input.txt");
+        let schematic = Schematic::from_str(input).unwrap();
+
+        let result = schematic.gears().iter()
+            .map(|gear| gear.ratio())
+            .sum::<u32>();
+
+        assert_eq!(80403602, result);
+    }
 
     #[test]
-    fn example() {
+    fn example_parts() {
         let input = "\
             467..114..\n\
             ...*......\n\
@@ -194,6 +241,33 @@ mod tests {
 
         let total = schematic.part_numbers().iter().sum::<u32>();
         assert_eq!(4361, total);
+    }
+
+    #[test]
+    fn example_gears() {
+        let input = "\
+            467..114..\n\
+            ...*......\n\
+            ..35..633.\n\
+            ......#...\n\
+            617*......\n\
+            .....+.58.\n\
+            ..592.....\n\
+            .......755\n\
+            ...$..*...\n\
+            .664.598..\n\
+        ";
+
+        let schematic = Schematic::from_str(input).unwrap();
+
+        let gears: Vec<Gear> = schematic.gears();
+        assert_eq!(true, gears.contains(&Gear(467, 35)));
+        assert_eq!(true, gears.contains(&Gear(755, 598)));
+
+        let total = schematic.gears().iter()
+            .map(|gear| gear.ratio())
+            .sum::<u32>();
+        assert_eq!(467835, total);
     }
 
     #[test]
