@@ -52,6 +52,51 @@ enum HandType {
     HighCard,
 }
 
+impl HandType {
+    fn with_jokers(&self, jokers: &i32) -> Self {
+        match self {
+            HandType::FiveKind => HandType::FiveKind,
+            HandType::FourKind => {
+                match jokers {
+                    0 => HandType::FourKind,
+                    &_ => HandType::FiveKind,
+                }
+            }
+            HandType::FullHouse => {
+                match jokers {
+                    n if n >= &2  => HandType::FiveKind,
+                    &_ => HandType::FullHouse,
+                }
+            }
+            HandType::ThreeKind => {
+                match jokers {
+                    n if n >= &1  => HandType::FourKind,
+                    &_ => HandType::ThreeKind,
+                }
+            }
+            HandType::TwoPair => {
+                match jokers {
+                    &2 => HandType::FourKind,
+                    &1 => HandType::FullHouse,
+                    &_ => HandType::TwoPair,
+                }
+            }
+            HandType::OnePair => {
+                match jokers {
+                    n if n >= &1  => HandType::ThreeKind,
+                    &_ => HandType::OnePair,
+                }
+            }
+            HandType::HighCard => {
+                match jokers {
+                    &1 => HandType::OnePair,
+                    &_ => HandType::HighCard,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Round {
     hand: Hand,
@@ -80,25 +125,6 @@ impl FromStr for Round {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Hand(Vec<Card>);
 
-impl PartialOrd for Hand {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match other.hand_type().cmp(&self.hand_type()) {
-            Ordering::Equal => {
-                let order = self.0.iter().zip(other.0.iter())
-                    .filter(|(a, b)| a != b)
-                    .find_map(|(a, b)| {
-                        match a.cmp(&b) {
-                            Ordering::Equal => None,
-                            order => Some(order.reverse()),
-                        }
-                    }).unwrap();
-                Some(order)
-            }
-            hand => Some(hand)
-        }
-    }
-}
-
 impl Hand {
     fn hand_type(&self) -> HandType {
         let frequencies = frequencies(&self.0);
@@ -115,6 +141,14 @@ impl Hand {
             [1, 1, 1, 1, 1] => HandType::HighCard,
             _ => panic!("Should not happen!")
         }
+    }
+
+    fn hand_type_with_jokers(&self) -> HandType {
+        let hand_type = self.hand_type();
+        let frequencies = frequencies(&self.0);
+        let jokers = frequencies.get(&Card::Jack).or(Some(&0)).unwrap();
+
+        hand_type.with_jokers(jokers)
     }
 }
 
@@ -134,11 +168,70 @@ fn ordered_rounds(input: &Vec<&str>) -> Vec<Round> {
         .map(|line| Round::from_str(line).unwrap())
         .collect();
 
+    // rounds.sort_by(|a, b| {
+    //     a.hand.partial_cmp(&b.hand).unwrap()
+    // });
+
     rounds.sort_by(|a, b| {
-        a.hand.partial_cmp(&b.hand).unwrap()
+        match b.hand.hand_type().cmp(&a.hand.hand_type()) {
+            Ordering::Equal => {
+                let order = a.hand.0.iter().zip(b.hand.0.iter())
+                    .filter(|(a, b)| a != b)
+                    .find_map(|(a, b)| {
+                        match a.cmp(&b) {
+                            Ordering::Equal => None,
+                            order => Some(order.reverse()),
+                        }
+                    }).unwrap();
+                Some(order)
+            }
+            hand => Some(hand)
+        }.unwrap()
     });
 
     rounds
+}
+
+fn ordered_rounds_with_jokers(input: &Vec<&str>) -> Vec<Round> {
+    let mut rounds: Vec<Round> = input.into_iter()
+        .map(|line| Round::from_str(line).unwrap())
+        .collect();
+
+    // rounds.sort_by(|a, b| {
+    //     a.hand.partial_cmp(&b.hand).unwrap()
+    // });
+
+    rounds.sort_by(|a, b| {
+        match b.hand.hand_type_with_jokers().cmp(&a.hand.hand_type_with_jokers()) {
+            Ordering::Equal => {
+                let order = a.hand.0.iter().zip(b.hand.0.iter())
+                    .filter(|(a, b)| a != b)
+                    .find_map(|(a, b)| {
+                        match (a, b) {
+                            (_, Card::Jack) => return Some(Ordering::Greater),
+                            (Card::Jack, _) => return Some(Ordering::Less),
+                            _ => {},
+                        };
+                        match a.cmp(&b) {
+                            Ordering::Equal => None,
+                            order => Some(order.reverse()),
+                        }
+                    }).unwrap();
+                Some(order)
+            }
+            hand => Some(hand)
+        }.unwrap()
+    });
+
+    rounds
+}
+
+fn sum_wins(rounds: Vec<Round>) -> u64 {
+    rounds.iter()
+        .map(|round| round.bid)
+        .enumerate()
+        .map(|(i, bid)| ((i as u32 + 1) * bid) as u64)
+        .sum::<u64>()
 }
 
 #[cfg(test)]
@@ -150,18 +243,23 @@ mod tests {
         let input = include_str!("../../input/day_07/input.txt").lines();
 
         let rounds: Vec<Round> = ordered_rounds(&input.collect());
-
-        let sum = rounds.iter()
-            .map(|round| round.bid)
-            .enumerate()
-            .map(|(i, bid)| ((i as u32 + 1) * bid) as u64)
-            .sum::<u64>();
+        let sum = sum_wins(rounds);
 
         assert_eq!(sum, 252656917);
     }
 
     #[test]
-    fn example() {
+    fn second_part() {
+        let input = include_str!("../../input/day_07/input.txt").lines();
+
+        let rounds: Vec<Round> = ordered_rounds_with_jokers(&input.collect());
+        let sum = sum_wins(rounds);
+
+        assert_eq!(sum, 252656917);
+    }
+
+    #[test]
+    fn example_cards() {
         let input = "\
         32T3K 765\n\
         T55J5 684\n\
@@ -171,12 +269,23 @@ mod tests {
         ".lines();
 
         let rounds: Vec<Round> = ordered_rounds(&input.collect());
+        let sum = sum_wins(rounds);
 
-        let sum = rounds.iter()
-            .map(|round| round.bid)
-            .enumerate()
-            .map(|(i, bid)| ((i as u32 + 1) * bid) as u64)
-            .sum::<u64>();
+        assert_eq!(sum, 6440);
+    }
+
+    #[test]
+    fn example_joker() {
+        let input = "\
+        32T3K 765\n\
+        T55J5 684\n\
+        KK677 28\n\
+        KTJJT 220\n\
+        QQQJA 483\n\
+        ".lines();
+
+        let rounds: Vec<Round> = ordered_rounds(&input.collect());
+        let sum = sum_wins(rounds);
 
         assert_eq!(sum, 6440);
     }
@@ -199,11 +308,4 @@ mod tests {
         assert_eq!(HandType::HighCard, Hand(vec![Card::Two, Card::Three, Card::Four, Card::Five, Card::Six]).hand_type());
     }
 
-    #[test]
-    fn hand_ordering() {
-        let hand_1 = Hand(vec![Card::Three, Card::Three, Card::Three, Card::Three, Card::Three]);
-        let hand_2 = Hand(vec![Card::Two, Card::Three, Card::Four, Card::Five, Card::Six]);
-
-        assert!(hand_1 > hand_2);
-    }
 }
