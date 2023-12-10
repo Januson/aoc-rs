@@ -11,7 +11,36 @@ struct Almanac {
     humidity_to_location: Mapper,
 }
 
+struct Seeds {
+    start: u64,
+    length: u64,
+}
+
+impl Seeds {
+    fn new(start: u64, length: u64) -> Self {
+        Seeds {
+            start, length
+        }
+    }
+
+    fn all(&self) -> Vec<u64> {
+        let end = self.start + self.length;
+        (self.start..end).collect::<Vec<u64>>()
+    }
+}
+
 impl Almanac {
+    fn seeds(&mut self) -> Vec<Seeds> {
+        let mut seeds = self.seeds.iter();
+        let mut all_seeds: Vec<Seeds> = Vec::new();
+        while let (Some(start), Some(length)) = (seeds.next(), seeds.next()) {
+            let seed = Seeds::new(*start, *length);
+            all_seeds.push(seed);
+        }
+
+        all_seeds
+    }
+
     fn locations_of(&mut self, seeds: &Vec<u64>) -> Vec<u64> {
         let mut locations: Vec<u64> = Vec::new();
         for seed in seeds {
@@ -28,6 +57,15 @@ impl Almanac {
 
         locations
     }
+
+    fn smallest_location_of(&mut self, seeds: Vec<u64>) -> Option<u64> {
+        let locations = self.locations_of(&seeds);
+        match locations.iter().min() {
+            None => None,
+            Some(location) => Some(*location)
+        }
+    }
+
 }
 
 impl FromStr for Almanac {
@@ -89,7 +127,7 @@ struct Mapping {
 
 impl Mapping {
     fn new(dest_start: u64, source_start: u64, length: u64) -> Self {
-        Mapping {dest_start, source_start, length}
+        Mapping { dest_start, source_start, length }
     }
 
     fn maps_to(&self, source: u64) -> Option<u64> {
@@ -142,7 +180,26 @@ mod tests {
         let seeds = almanac.seeds.clone();
         let locations = &almanac.locations_of(&seeds);
 
-        assert_eq!(&35, locations.iter().min().unwrap());
+        assert_eq!(&535088217, locations.iter().min().unwrap());
+    }
+
+    #[test]
+    fn second_part() {
+        let input = include_str!("../../input/day_05/input.txt");
+        let mut almanac = Almanac::from_str(input).unwrap();
+
+        let mut locations: Vec<Option<u64>> = Vec::new();
+        let seeds = almanac.seeds();
+        for seed in seeds {
+            let location = almanac.smallest_location_of(seed.all());
+            locations.push(location);
+        }
+
+        let smallest = locations.iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .min().unwrap();
+        assert_eq!(51399228, smallest);
     }
 
     #[test]
