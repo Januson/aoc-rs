@@ -1,17 +1,15 @@
-use std::str::Lines;
-
 struct Race {
-    length: u32,
-    record_distance: u32,
+    length: u64,
+    record_distance: u64,
 }
 
 impl Race {
-    fn new(length: u32, record_distance: u32) -> Self {
-        Race { length, record_distance}
+    fn new(length: u64, record_distance: u64) -> Self {
+        Race { length, record_distance }
     }
 
-    fn strategies(&self) -> Vec<u32> {
-        let mut winning: Vec<u32> = Vec::new();
+    fn strategies(&self) -> Vec<u64> {
+        let mut winning: Vec<u64> = Vec::new();
         for speed in 0..self.length {
             let remaining_time = self.length - speed;
             let travelled_distance = remaining_time * speed;
@@ -24,12 +22,12 @@ impl Race {
     }
 }
 
-fn parse_row(input: &mut Lines, label: &str) -> Vec<u32> {
-    input.next().unwrap()
+fn parse_row(input: Option<String>, label: &str) -> Vec<u64> {
+    input.unwrap()
         .strip_prefix(label).unwrap()
         .split(' ').into_iter()
         .filter(|x| !x.is_empty())
-        .map(|x| x.parse::<u32>().unwrap())
+        .map(|x| x.parse::<u64>().unwrap())
         .collect()
 }
 
@@ -41,13 +39,28 @@ mod tests {
     fn first_part() {
         let mut input = include_str!("../../input/day_06/input.txt").lines();
 
-        let lengths: Vec<u32> = parse_row(&mut input, "Time:");
-        let records: Vec<u32> = parse_row(&mut input, "Distance:");
+        let lengths: Vec<u64> = parse_row(input.next().map(|x| x.to_string()), "Time:");
+        let records: Vec<u64> = parse_row(input.next().map(|x| x.to_string()), "Distance:");
 
         let result = lengths.iter().zip(records.iter())
             .map(|(length, record)| Race::new(*length, *record))
             .map(|race| race.strategies().len())
             .fold(1, |a, b| a * b);
+
+        assert_eq!(781200, result);
+    }
+
+    #[test]
+    fn second_part() {
+        let mut input = include_str!("../../input/day_06/input.txt").lines();
+
+        let lengths: Vec<u64> = parse_row(input.next().map(|x| x.replace(' ', "")), "Time:");
+        let records: Vec<u64> = parse_row(input.next().map(|x| x.replace(' ', "")), "Distance:");
+
+        let result = lengths.iter().zip(records.iter())
+            .map(|(length, record)| Race::new(*length, *record))
+            .map(|race| race.strategies().len())
+            .next().unwrap();
 
         assert_eq!(781200, result);
     }
@@ -64,5 +77,4 @@ mod tests {
         assert_eq!(4, strategies[2]);
         assert_eq!(5, strategies[3]);
     }
-
 }
