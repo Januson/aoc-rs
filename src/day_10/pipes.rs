@@ -22,12 +22,12 @@ impl Direction {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 struct Point2D {
-    x: usize,
-    y: usize,
+    x: i32,
+    y: i32,
 }
 
 impl Point2D {
-    fn new(x: usize, y: usize) -> Self {
+    fn new(x: i32, y: i32) -> Self {
         Point2D {
             x,
             y,
@@ -40,15 +40,6 @@ impl Point2D {
             Direction::Down => Point2D::new(self.x, self.y + 1),
             Direction::Left => Point2D::new(self.x - 1, self.y),
             Direction::Right => Point2D::new(self.x + 1, self.y),
-        }
-    }
-
-    fn is_next(&self, location: &Point2D, direction: Direction) -> bool {
-        match direction {
-            Direction::Up => self.x == location.x && self.y - 1 == location.y,
-            Direction::Down => self.x == location.x && self.y + 1 == location.y,
-            Direction::Left => self.x - 1 == location.x && self.y == location.y,
-            Direction::Right => self.x + 1 == location.x && self.y == location.y,
         }
     }
 }
@@ -83,13 +74,6 @@ impl Tile {
     fn is_start(&self) -> bool {
         match self {
             Tile::Start => true,
-            _ => false,
-        }
-    }
-
-    fn is_ground(&self) -> bool {
-        match self {
-            Tile::Ground => true,
             _ => false,
         }
     }
@@ -180,7 +164,7 @@ impl FromStr for PipeMap {
         let mut start: Option<Point2D> = None;
         for (y, line) in s.lines().enumerate() {
             for (x, char) in line.chars().enumerate() {
-                let location = Point2D::new(x, y);
+                let location = Point2D::new(x as i32, y as i32);
                 let tile = Tile::from(char);
                 if tile.is_start() {
                     start = Some(location.clone());
@@ -194,7 +178,7 @@ impl FromStr for PipeMap {
 }
 
 impl PipeMap {
-    fn find_loop(&mut self) -> VecDeque<Point2D> {
+    fn find_loop(&mut self) -> PipeLoop {
         let mut path: VecDeque<Point2D> = VecDeque::new();
         let mut current = &self.start;
 
@@ -228,8 +212,79 @@ impl PipeMap {
             direction = next_direction.unwrap();
         }
 
-        path
+        PipeLoop { segments: path.iter().cloned().collect() }
     }
+}
+
+struct PipeLoop {
+    segments: Vec<Point2D>,
+}
+
+impl PipeLoop {
+    fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    fn area(&self) -> i32 {
+        let vertices = find_vertices(&self.segments);
+
+        let area = polygon_area(&vertices);
+
+        picks_theorem(area, self.segments.len() as i32)
+    }
+}
+
+fn find_vertices(coordinates: &Vec<Point2D>) -> Vec<Point2D> {
+    let mut vertices = Vec::new();
+
+    if coordinates.len() < 3 {
+        // Not enough points to form a polygon
+        return vertices;
+    }
+
+    // Iterate through consecutive triplets of points
+    for i in 0..coordinates.len() {
+        let p1 = &coordinates[i];
+        let p2 = &coordinates[(i + 1) % coordinates.len()];
+        let p3 = &coordinates[(i + 2) % coordinates.len()];
+
+        // Check if the points form a convex angle (left turn)
+        if is_convex_angle(p1, p2, p3) {
+            vertices.push(p2.clone());
+        }
+    }
+
+    vertices
+}
+
+// Helper function to check if three points form a convex angle (left turn)
+fn is_convex_angle(p1: &Point2D, p2: &Point2D, p3: &Point2D) -> bool {
+    let a = p1.x * (p2.y - p3.y) +
+        p2.x * (p3.y - p1.y) +
+        p3.x * (p1.y - p2.y);
+
+    a != 0
+}
+
+/// Uses Pick's Theorem to calculate the number of interior points
+fn picks_theorem(area: i32, boundary_points: i32) -> i32 {
+    area - boundary_points / 2 + 1
+}
+
+/// Use shoelace formula to calculate area of a polygon from it's vertices.
+fn polygon_area(coordinates: &[Point2D]) -> i32 {
+    let n = coordinates.len();
+    if n < 3 {
+        return 0; // Not enough points to form a polygon
+    }
+
+    let mut sum = 0;
+    for i in 0..n {
+        let j = (i + 1) % n;
+        sum += coordinates[i].x * coordinates[j].y - coordinates[j].x * coordinates[i].y;
+    }
+
+    sum.abs() / 2
 }
 
 #[cfg(test)]
@@ -248,7 +303,18 @@ mod tests {
     }
 
     #[test]
-    fn example() {
+    fn second_part() {
+        let input = include_str!("../../input/day_10/input.txt");
+
+        let mut pipes = PipeMap::from_str(input).unwrap();
+
+        let pipe_loop = pipes.find_loop();
+
+        assert_eq!(pipe_loop.area(), 371);
+    }
+
+    #[test]
+    fn example_distant_point() {
         let input = "\
         .....\n\
         .S-7.\n\
@@ -263,6 +329,44 @@ mod tests {
 
         assert_eq!(pipes.start, Point2D::new(1, 1));
         assert_eq!(pipe_loop.len() / 2, 4);
+    }
+
+    #[test]
+    fn example_inside_loop_simple() {
+        let input = "\
+        .....\n\
+        .S-7.\n\
+        .|.|.\n\
+        .L-J.\n\
+        .....\n\
+        ";
+
+        let mut pipes = PipeMap::from_str(input).unwrap();
+
+        let pipe_loop = pipes.find_loop();
+
+        assert_eq!(pipe_loop.area(), 1);
+    }
+
+    #[test]
+    fn example_inside_loop() {
+        let input = "\
+        ...........\n\
+        .S-------7.\n\
+        .|F-----7|.\n\
+        .||.....||.\n\
+        .||.....||.\n\
+        .|L-7.F-J|.\n\
+        .|..|.|..|.\n\
+        .L--J.L--J.\n\
+        ...........\n\
+        ";
+
+        let mut pipes = PipeMap::from_str(input).unwrap();
+
+        let pipe_loop = pipes.find_loop();
+
+        assert_eq!((pipe_loop.area()), 4);
     }
 
     #[test]
@@ -293,4 +397,21 @@ mod tests {
         assert_eq!(Direction::Down, Tile::TurnSouthWest.leads_to(&Direction::Left).unwrap());
     }
 
+    #[test]
+    fn detect_angle() {
+        let p1 = Point2D::new(1, 1);
+        let p2 = Point2D::new(2, 2);
+        let p3 = Point2D::new(3, 1);
+
+        assert!(is_convex_angle(&p1, &p2, &p3));
+    }
+
+    #[test]
+    fn detect_not_angle() {
+        let p1 = Point2D::new(1, 3);
+        let p2 = Point2D::new(2, 3);
+        let p3 = Point2D::new(3, 3);
+
+        assert!(!is_convex_angle(&p1, &p2, &p3));
+    }
 }
