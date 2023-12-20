@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Spring {
     Operational,
     Damaged,
@@ -19,15 +19,32 @@ impl Spring {
     }
 }
 
+#[derive(Debug)]
 struct Springs(Vec<Spring>);
+
+impl Springs {
+    fn unfold(&self, n: usize) -> Self {
+        Springs(Self::repeat(&self.0, n))
+    }
+
+    fn repeat(original: &Vec<Spring>, n: usize) -> Vec<Spring> {
+        let separator = vec![Spring::Unknown];
+
+        original
+            .iter()
+            .cloned()
+            .chain(separator.iter().cloned())
+            .cycle()
+            .take(original.len() * n + n - 1)
+            .collect()
+    }
+}
 
 impl FromStr for Springs {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chars = s.chars()
-            // Append . to avoid bound checking
-            .chain(vec!['.'])
             .map(|c| Spring::from(c))
             .collect();
 
@@ -36,6 +53,18 @@ impl FromStr for Springs {
 }
 
 struct Pattern(Vec<usize>);
+
+impl Pattern {
+    fn unfold(&self, n: usize) -> Self {
+        let unfolded = self.0.iter()
+            .cloned()
+            .cycle()
+            .take(self.0.len() * n)
+            .collect();
+
+        Pattern(unfolded)
+    }
+}
 
 impl FromStr for Pattern {
     type Err = ();
@@ -72,55 +101,71 @@ impl FromStr for Record {
 }
 
 impl Record {
-    fn possible_solutions(&self) -> i32 {
+    fn unfold(&self, n: usize) -> Self {
+        let springs = self.springs.unfold(n);
+        let broken = self.broken.unfold(n);
+        Record { springs, broken }
+    }
+
+    fn possible_solutions(&self) -> u64 {
         self.count_possible(&self.springs, &self.broken)
     }
 
-    fn count_possible(&self, springs: &Springs, conditions: &Pattern) -> i32 {
-        let mut current_states = HashMap::new();
-        current_states.insert((0, 0, 0), 1);
+    fn count_possible(&self, springs: &Springs, conditions: &Pattern) -> u64 {
+        let states = self.build_states(conditions);
 
         let mut next_states = HashMap::new();
+        let mut current_states = HashMap::new();
+        current_states.insert(0, 1);
 
         for spring in &springs.0 {
-            for (&state, &num) in &current_states {
-                let (mut ci, mut cc, mut expdot) = state;
+            for (state_key, state) in current_states {
+                let next_state = state_key + 1;
                 match spring {
-                    Spring::Damaged | Spring::Unknown if ci < conditions.0.len() && expdot == 0 => {
-                        if spring == &Spring::Unknown && cc == 0 {
-                            *next_states.entry((ci, cc, expdot)).or_insert(0) += num;
+                    Spring::Unknown => {
+                        if next_state < states.len() {
+                            *next_states.entry(next_state).or_insert(0) += state;
                         }
-                        cc += 1;
-                        if cc == conditions.0[ci] {
-                            ci = ci + 1;
-                            cc = 0;
-                            expdot = 1;
+
+                        if states[state_key] == Spring::Operational {
+                            *next_states.entry(state_key).or_insert(0) += state;
                         }
-                        let next_state = (ci, cc, expdot);
-                        *next_states.entry(next_state).or_insert(0) += num;
                     }
-                    Spring::Operational | Spring::Unknown if cc == 0 => {
-                        let next_state = (ci, cc, 0);
-                        *next_states.entry(next_state).or_insert(0) += num;
+                    Spring::Operational => {
+                        if next_state < states.len() && states[next_state] == Spring::Operational {
+                            *next_states.entry(next_state).or_insert(0) += state;
+                        }
+
+                        if states[state_key] == Spring::Operational {
+                            *next_states.entry(state_key).or_insert(0) += state;
+                        }
                     }
-                    _ => {}
+                    Spring::Damaged => {
+                        if next_state < states.len() && states[next_state] == Spring::Damaged {
+                            *next_states.entry(next_state).or_insert(0) += state;
+                        }
+                    }
                 }
             }
-            current_states = next_states.clone();
+            current_states = next_states;
             next_states = HashMap::new();
         }
 
-        // sum states that reached the end of the pattern
-        let mut possible = 0;
-        for (&state, &v) in &current_states {
-            if state.0 == conditions.0.len() {
-                possible += v;
-            }
-        }
-
-        possible
+        current_states.get(&(states.len() - 1)).unwrap_or(&0) + current_states.get(&(states.len() - 2)).unwrap_or(&0)
     }
 
+    fn build_states(&self, conditions: &Pattern) -> Vec<Spring> {
+        let mut states = Vec::new();
+        for condition in &conditions.0 {
+            states.push(Spring::Operational);
+            for _ in 0..*condition as i32 {
+                states.push(Spring::Damaged);
+            }
+        }
+        states.push(Spring::Operational);
+
+        states
+    }
 }
 
 #[cfg(test)]
@@ -131,16 +176,29 @@ mod tests {
     fn first_part() {
         let input = include_str!("../../input/day_12/input.txt");
 
-        let result: i32 = input.lines()
+        let result: u64 = input.lines()
             .map(|line| Record::from_str(line).unwrap())
             .map(|record| record.possible_solutions())
             .sum();
 
-        assert_eq!(result, 8631); // Too high
+        assert_eq!(result, 7407);
     }
 
     #[test]
-    fn example() {
+    fn second_part() {
+        let input = include_str!("../../input/day_12/input.txt");
+
+        let result = input.lines()
+            .map(|line| Record::from_str(line).unwrap())
+            .map(|record| record.unfold(5))
+            .map(|record| record.possible_solutions())
+            .sum::<u64>();
+
+        assert_eq!(result, 30568243604962);
+    }
+
+    #[test]
+    fn example_folded() {
         let input = "\
         ???.### 1,1,3\n\
         .??..??...?##. 1,1,3\n\
@@ -150,12 +208,34 @@ mod tests {
         ?###???????? 3,2,1\n\
         ";
 
-        let result: i32 = input.lines()
+        let result: u64 = input.lines()
             .map(|line| Record::from_str(line).unwrap())
             .map(|record| record.possible_solutions())
             .sum();
 
         assert_eq!(result, 21);
+    }
+
+    #[test]
+    fn example_unfolded() {
+        let input = "\
+        ???.### 1,1,3\n\
+        .??..??...?##. 1,1,3\n\
+        ?#?#?#?#?#?#?#? 1,3,1,6\n\
+        ????.#...#... 4,1,1\n\
+        ????.######..#####. 1,6,5\n\
+        ?###???????? 3,2,1\n\
+        ";
+
+        let solutions: Vec<u64> = input.lines()
+            .map(|line| Record::from_str(line).unwrap())
+            .map(|record| record.unfold(5))
+            .map(|record| record.possible_solutions())
+            .collect();
+
+        let result: u64 = solutions.iter().sum();
+
+        assert_eq!(result, 525152);
     }
 
     #[test]
@@ -189,18 +269,25 @@ mod tests {
     fn ten_solutions() {
         let record = Record::from_str("?###???????? 3,2,1").unwrap();
 
-        let solutions = record.possible_solutions();
-
-        assert_eq!(10, solutions);
+        assert_eq!(10, record.possible_solutions());
     }
 
     #[test]
-    fn random_solutions() {
-        let record = Record::from_str("?.?#??.?#? 4,2").unwrap();
+    fn unfold_record() {
+        let record = Record::from_str(".# 1").unwrap();
 
-        let solutions = record.possible_solutions();
+        let unfolded = record.unfold(5);
 
-        assert_eq!(2, solutions);
+        assert_eq!(unfolded.springs.0, vec![
+            Spring::Operational, Spring::Damaged, Spring::Unknown,
+            Spring::Operational, Spring::Damaged, Spring::Unknown,
+            Spring::Operational, Spring::Damaged, Spring::Unknown,
+            Spring::Operational, Spring::Damaged, Spring::Unknown,
+            Spring::Operational, Spring::Damaged,
+        ]);
+
+        assert_eq!(unfolded.broken.0, vec![
+            1, 1, 1, 1, 1,
+        ]);
     }
-
 }
