@@ -33,6 +33,19 @@ impl LocationList {
             .map(|(a, b)| a.distance_to(b))
             .sum()
     }
+
+    fn similarity_of(&self, location: &LocationId) -> i32 {
+        let occurrences = self.locations.iter()
+            .filter(|id| id == &location)
+            .count();
+        location.0 * occurrences as i32
+    }
+
+    fn similarity(&self, other: &LocationList) -> i32 {
+        self.locations.iter()
+            .map(|id| other.similarity_of(id))
+            .sum()
+    }
 }
 
 fn parse_location_lists(input: &str) -> (LocationList, LocationList) {
@@ -62,6 +75,16 @@ mod tests {
         let total_distance = list_1.distance_to(&mut list_2);
 
         assert_eq!(total_distance, 1_873_376);
+    }
+
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/day_01/input.txt");
+        let (list_1, mut list_2) = parse_location_lists(input);
+
+        let total_distance = list_1.similarity(&mut list_2);
+
+        assert_eq!(total_distance, 18_997_088);
     }
 
     #[test]
@@ -102,5 +125,42 @@ mod tests {
 
         assert_eq!(expected_list_1, list_1);
         assert_eq!(expected_list_2, list_2);
+    }
+
+    #[test]
+    fn single_id_similarity() {
+        let location_list = LocationList {
+            locations: vec![LocationId(1), LocationId(3), LocationId(3), LocationId(3)],
+        };
+
+        assert_eq!(0, location_list.similarity_of(&LocationId(7)));
+        assert_eq!(1, location_list.similarity_of(&LocationId(1)));
+        assert_eq!(9, location_list.similarity_of(&LocationId(3)));
+    }
+
+    #[test]
+    fn list_similarity() {
+        let location_list_1 = LocationList {
+            locations: vec![
+                LocationId(3),
+                LocationId(4),
+                LocationId(2),
+                LocationId(1),
+                LocationId(3),
+                LocationId(3)
+            ],
+        };
+        let location_list_2 = LocationList {
+            locations: vec![
+                LocationId(4),
+                LocationId(3),
+                LocationId(5),
+                LocationId(3),
+                LocationId(9),
+                LocationId(3)
+            ],
+        };
+
+        assert_eq!(31, location_list_1.similarity(&location_list_2));
     }
 }
