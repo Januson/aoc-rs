@@ -4,6 +4,21 @@ use std::str::FromStr;
 struct Report(Vec<i32>);
 
 impl Report {
+    fn is_safe_dampened(&self) -> bool {
+        if self.is_safe() {
+            true
+        } else {
+            for i in 0..self.0.len() {
+                let mut levels = self.0.clone();
+                levels.remove(i);
+                if Report(levels).is_safe() {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
     fn is_safe(&self) -> bool {
         let direction = self.0[1] - self.0[0];
         self.0.windows(2).all(|x| {
@@ -52,6 +67,18 @@ mod tests {
     }
 
     #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/day_02/input.txt");
+        let reports = parse_reports(input);
+
+        let safe_reports = reports.iter()
+            .filter(|report| report.is_safe_dampened())
+            .count();
+
+        assert_eq!(318, safe_reports);
+    }
+
+    #[test]
     fn test_report_safety_decreasing() {
         let report = Report(vec![7, 6, 4, 2, 1]);
         assert_eq!(true, report.is_safe());
@@ -73,6 +100,20 @@ mod tests {
     fn test_report_unsafe_non_linear() {
         assert_eq!(false, Report(vec![1, 9]).is_safe());
         assert_eq!(false, Report(vec![9, 1]).is_safe());
+    }
+
+    #[test]
+    fn test_report_unsafe_dampener() {
+        assert_eq!(true, Report(vec![1, 9, 3]).is_safe_dampened());
+        assert_eq!(false, Report(vec![1, 1, 9, 3]).is_safe_dampened());
+        assert_eq!(false, Report(vec![1, 1, 9, 3]).is_safe_dampened());
+        assert_eq!(true, Report(vec![7, 6, 4, 2, 1]).is_safe_dampened());
+        assert_eq!(true, Report(vec![1, 3, 2, 4, 5]).is_safe_dampened());
+        assert_eq!(true, Report(vec![8, 6, 4, 4, 1]).is_safe_dampened());
+        assert_eq!(true, Report(vec![1, 3, 6, 7, 9]).is_safe_dampened());
+        assert_eq!(false, Report(vec![9, 9, 7, 7, 1]).is_safe_dampened());
+        assert_eq!(false, Report(vec![1, 2, 7, 8, 9]).is_safe_dampened());
+        assert_eq!(false, Report(vec![9, 7, 6, 2, 1]).is_safe_dampened());
     }
 
     #[test]
