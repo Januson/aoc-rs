@@ -89,13 +89,13 @@ impl TextBlock {
     }
 }
 
-struct CerexSearch {
+struct CeresSearch {
     text: TextBlock,
 }
 
-impl CerexSearch {
-    fn new(text: TextBlock) -> CerexSearch {
-        CerexSearch { text }
+impl CeresSearch {
+    fn new(text: TextBlock) -> CeresSearch {
+        CeresSearch { text }
     }
 
     fn search(&self, keys: &[&str]) -> i32 {
@@ -112,6 +112,39 @@ impl CerexSearch {
 
         result
     }
+
+    fn count_x_mas(&self) -> usize {
+        let grid: &[String] = &self.text.0;
+        let rows = grid.len();
+        let cols = grid[0].len();
+
+        let mut count = 0;
+
+        for x in 1..(rows - 1) {
+            for y in 1..(cols - 1) {
+                let center = Self::char_at(grid, x, y);
+                let top_left = Self::char_at(grid, x - 1, y - 1);
+                let top_right = Self::char_at(grid, x - 1, y + 1);
+                let bottom_left = Self::char_at(grid, x + 1, y - 1);
+                let bottom_right = Self::char_at(grid, x + 1, y + 1);
+
+                if self.forms_mas(top_left, center, bottom_right) &&
+                    self.forms_mas(top_right, center, bottom_left) {
+                    count += 1;
+                }
+            }
+        }
+
+        count
+    }
+
+    fn char_at(grid: &[String], x: usize, y: usize) -> char {
+        grid[x].chars().nth(y).unwrap_or('_')
+    }
+
+    fn forms_mas(&self, left: char, middle: char, right: char) -> bool {
+        middle == 'A' && ((left == 'M' && right == 'S') || (left == 'S' && right == 'M'))
+    }
 }
 
 #[cfg(test)]
@@ -124,9 +157,19 @@ mod tests {
         let text: TextBlock = TextBlock::from_str(input).unwrap();
         let keys = vec!["XMAS", "SAMX"];
 
-        let cerex = CerexSearch::new(text);
+        let cerex = CeresSearch::new(text);
 
         assert_eq!(2562, cerex.search(&keys));
+    }
+
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/day_04/input.txt");
+        let text: TextBlock = TextBlock::from_str(input).unwrap();
+
+        let cerex = CeresSearch::new(text);
+
+        assert_eq!(1902, cerex.count_x_mas());
     }
 
     #[test]
@@ -284,8 +327,28 @@ mod tests {
         ];
         let keys = vec!["XMAS", "SAMX"];
 
-        let cerex = CerexSearch::new(TextBlock(input));
+        let cerex = CeresSearch::new(TextBlock(input));
 
         assert_eq!(18, cerex.search(&keys[..]));
+    }
+
+    #[test]
+    fn test_cerex_search2() {
+        let input = vec![
+            "MMMSXXMASM".to_string(),
+            "MSAMXMSMSA".to_string(),
+            "AMXSXMAAMM".to_string(),
+            "MSAMASMSMX".to_string(),
+            "XMASAMXAMM".to_string(),
+            "XXAMMXXAMA".to_string(),
+            "SMSMSASXSS".to_string(),
+            "SAXAMASAAA".to_string(),
+            "MAMMMXMMMM".to_string(),
+            "MXMXAXMASX".to_string(),
+        ];
+
+        let cerex = CeresSearch::new(TextBlock(input));
+
+        assert_eq!(9, cerex.count_x_mas());
     }
 }
