@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -15,7 +17,7 @@ impl FromStr for OrderingRule {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Update(Vec<u8>);
 
 impl FromStr for Update {
@@ -39,6 +41,29 @@ impl Update {
         let second = self.0.iter().position(|&r| r == ordering.1).unwrap();
 
         first < second
+    }
+
+    fn middle(&self) -> u8 {
+        let length = self.0.len() / 2;
+        *self.0.iter().nth(length).unwrap()
+    }
+
+    fn fixed(&self, ordering: &HashMap<u8, Vec<u8>>) -> Update {
+        let mut pages = self.0.clone();
+        let default = vec![];
+        pages.sort_by(|a, b| {
+            let order_a = ordering.get(&a).unwrap_or(&default);
+            let order_b = ordering.get(&b).unwrap_or(&default);
+            if order_a.contains(b) {
+                Ordering::Less
+            } else if order_b.contains(a) {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        });
+
+        Update(pages)
     }
 }
 
@@ -67,12 +92,25 @@ impl FromStr for PrintQueueUpdate {
 }
 
 impl PrintQueueUpdate {
-    fn correct_updates(&self) -> Vec<&Update> {
+    fn correct_updates(&self) -> Vec<Update> {
         let mut correct_updates = vec![];
 
         for update in &self.updates {
             let meets_all_rules = &self.ordering.iter().all(|rule| update.meets(rule));
             if *meets_all_rules {
+                correct_updates.push((*update).clone());
+            }
+        }
+
+        correct_updates
+    }
+
+    fn corrupted_updates(&self) -> Vec<Update> {
+        let mut correct_updates = vec![];
+
+        for update in self.updates.clone() {
+            let meets_all_rules = &self.ordering.iter().all(|rule| update.meets(rule));
+            if !*meets_all_rules {
                 correct_updates.push(update);
             }
         }
@@ -81,12 +119,27 @@ impl PrintQueueUpdate {
     }
 
     fn checksum(&self) -> u64 {
-        self.correct_updates().iter()
-            .map(|x| {
-                let length = x.0.len() / 2;
-                *x.0.iter().nth(length).unwrap() as u64
-            })
+        let updates = self.correct_updates();
+        Self::calculate_checksum(&updates)
+    }
+
+    fn calculate_checksum(updates: &[Update]) -> u64 {
+        updates.iter()
+            .map(|x| x.middle() as u64)
             .sum()
+    }
+
+    fn fixed_checksum(&self) -> u64 {
+        let mut ordering: HashMap<u8, Vec<u8>> = HashMap::new();
+        for order in &self.ordering {
+            ordering.entry(order.0).or_insert(vec![]).push(order.1);
+        }
+
+        let corrupted = self.corrupted_updates();
+        let fixed = corrupted.iter()
+            .map(|update| update.fixed(&ordering))
+            .collect::<Vec<Update>>();
+        Self::calculate_checksum(&fixed)
     }
 }
 
@@ -100,6 +153,14 @@ mod tests {
         let update = PrintQueueUpdate::from_str(input).unwrap();
 
         assert_eq!(update.checksum(), 5091);
+    }
+
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/day_05/input.txt");
+        let update = PrintQueueUpdate::from_str(input).unwrap();
+
+        assert_eq!(update.fixed_checksum(), 4681);
     }
 
     #[test]
@@ -126,8 +187,39 @@ mod tests {
     }
 
     #[test]
+    fn test_update_fixing() {
+        let queue_update = INPUT.parse::<PrintQueueUpdate>().unwrap();
+        let update = Update(vec![75, 97, 47, 61, 53]);
+
+        let mut ordering: HashMap<u8, Vec<u8>> = HashMap::new();
+        for order in queue_update.ordering {
+            ordering.entry(order.0).or_insert(vec![]).push(order.1);
+        }
+
+        let fixed = update.fixed(&ordering);
+
+        assert_eq!(fixed.0, vec![97, 75, 47, 61, 53]);
+    }
+
+    #[test]
     fn test_full() {
-        let input = "\
+        let update = INPUT.parse::<PrintQueueUpdate>().unwrap();
+
+        let correct = update.correct_updates();
+        assert_eq!(correct, vec![
+            Update(vec![75, 47, 61, 53, 29]),
+            Update(vec![97, 61, 53, 29, 13]),
+            Update(vec![75, 29, 13]),
+        ]);
+
+        let result: u64 = update.checksum();
+        assert_eq!(result, 143);
+
+        let result: u64 = update.fixed_checksum();
+        assert_eq!(result, 123);
+    }
+
+    const INPUT: &str = "\
             47|53\n\
             97|13\n\
             97|61\n\
@@ -157,40 +249,4 @@ mod tests {
             61,13,29\n\
             97,13,75,29,47\n\
         ";
-        let update = input.parse::<PrintQueueUpdate>().unwrap();
-
-        let correct = update.correct_updates();
-        assert_eq!(correct, vec![
-            &Update(vec![75, 47, 61, 53, 29]),
-            &Update(vec![97, 61, 53, 29, 13]),
-            &Update(vec![75, 29, 13]),
-        ]);
-
-        let result: u64 = update.checksum();
-        assert_eq!(result, 143)
-    }
-    //
-    // let INPUT: Vec<&str> = vec![
-    //     "47|53",
-    //     "97|13",
-    //     "97|61",
-    //     "97|47",
-    //     "75|29",
-    //     "61|13",
-    //     "75|53",
-    //     "29|13",
-    //     "97|29",
-    //     "53|29",
-    //     "61|53",
-    //     "97|53",
-    //     "61|29",
-    //     "47|13",
-    //     "75|47",
-    //     "97|75",
-    //     "47|61",
-    //     "75|61",
-    //     "47|29",
-    //     "75|13",
-    //     "53|13",
-    // ];
 }
