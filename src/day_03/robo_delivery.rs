@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use crate::day_03::robo_delivery::Direction::{East, North, South, West};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Direction {
     North,
     South,
@@ -51,18 +51,38 @@ impl Santa {
         Santa { instructions }
     }
 
-    fn delivery(&self) -> usize {
+    fn santa_delivery(&self) -> usize {
+        self.delivery(&self.instructions).len()
+    }
+
+    fn robo_delivery(&self) -> usize {
+        let santa_instructions: Vec<_> = self.instructions.iter()
+            .step_by(2)
+            .copied().collect();
+        let robo_instructions: Vec<_> = self.instructions.iter()
+            .skip(1)
+            .step_by(2)
+            .copied().collect();
+
+        let mut result = HashSet::new();
+        result.extend(self.delivery(&santa_instructions));
+        result.extend(self.delivery(&robo_instructions));
+
+        result.len()
+    }
+
+    fn delivery(&self, instructions: &[Direction]) -> HashSet<Point> {
         let mut visited = HashSet::new();
         let mut current = Point::new(0, 0);
         visited.insert(current);
 
-        self.instructions.iter()
+        instructions.iter()
             .for_each(|direction| {
                 current = current.move_in(direction);
                 visited.insert(current);
             });
 
-        visited.len()
+        visited
     }
 }
 
@@ -81,7 +101,17 @@ mod tests {
         let instructions = parse_instructions(input);
         let santa = Santa::new(instructions);
 
-        assert_eq!(santa.delivery(), 2565);
+        assert_eq!(santa.santa_delivery(), 2565);
+    }
+
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_03/input.txt");
+
+        let instructions = parse_instructions(input);
+        let santa = Santa::new(instructions);
+
+        assert_eq!(santa.robo_delivery(), 2639);
     }
 
     #[test]
@@ -110,4 +140,17 @@ mod tests {
         assert_eq!(point, Point::new(1, 1));
     }
 
+    #[test]
+    fn test_santa_delivery() {
+        let santa = Santa::new(parse_instructions("^v^v^v^v^v"));
+
+        assert_eq!(santa.santa_delivery(), 2);
+    }
+
+    #[test]
+    fn test_robo_delivery() {
+        let santa = Santa::new(parse_instructions("^v^v^v^v^v"));
+
+        assert_eq!(santa.robo_delivery(), 11);
+    }
 }
