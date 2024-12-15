@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::utils::frequencies::frequencies;
 
 struct Directions(String);
 
@@ -24,26 +24,6 @@ impl Directions {
 
         reductions.iter().position(|&x| x == -1).unwrap_or(0) as i32 + 1
     }
-}
-
-struct Frequencies {
-    frequencies: HashMap<char, u32>,
-}
-
-impl Frequencies {
-    fn get(&self, c: char) -> u32 {
-        *self.frequencies.get(&c).unwrap_or(&0)
-    }
-}
-
-fn frequencies(text: &str) -> Frequencies {
-    let frequencies = text.chars().fold(HashMap::new(), |mut acc, c| {
-        let counter = acc.entry(c).or_insert(0);
-        *counter += 1;
-        acc
-    });
-
-    Frequencies { frequencies }
 }
 
 fn reductions<T, R, F>(init: R, iter: impl IntoIterator<Item = T>, mut func: F) -> Vec<R>
@@ -107,16 +87,6 @@ mod tests {
     fn combinations() {
         let directions = Directions::new("()()(()");
         assert_eq!(directions.final_floor(), 1);
-    }
-
-    #[test]
-    fn test_frequencies() {
-        let frequencies = frequencies("aabddd");
-
-        assert_eq!(frequencies.get('a'), 2);
-        assert_eq!(frequencies.get('b'), 1);
-        assert_eq!(frequencies.get('c'), 0);
-        assert_eq!(frequencies.get('d'), 3);
     }
 
     #[test]
