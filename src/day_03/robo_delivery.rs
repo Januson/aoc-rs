@@ -1,43 +1,15 @@
 use std::collections::HashSet;
-use crate::day_03::robo_delivery::Direction::{East, North, South, West};
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum Direction {
-    North,
-    South,
-    East,
-    West,
-}
+use crate::utils::direction::Direction;
+use crate::utils::points_2d::Point;
 
 impl From<char> for Direction {
     fn from(value: char) -> Self {
         match value {
-            '^' => North,
-            'v' => South,
-            '>' => East,
-            '<' => West,
+            '^' => Direction::North,
+            'v' => Direction::South,
+            '>' => Direction::East,
+            '<' => Direction::West,
             _ => panic!("Invalid direction: {}", value),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-impl Point {
-    fn new(x: i32, y: i32) -> Self {
-        Point { x, y, }
-    }
-
-    fn move_in(&self, direction: &Direction) -> Self {
-        match direction {
-            North => Point::new(self.x, self.y - 1),
-            South => Point::new(self.x, self.y + 1),
-            East => Point::new(self.x + 1, self.y),
-            West => Point::new(self.x - 1, self.y),
         }
     }
 }
@@ -118,25 +90,25 @@ mod tests {
     fn direction_parsing() {
         let direction = Direction::from('^');
 
-        assert_eq!(direction, North);
+        assert_eq!(direction, Direction::North);
     }
 
     #[test]
     fn moving_points() {
         let mut point = Point::new(0, 0);
 
-        point = point.move_in(&North);
+        point = point.move_in(&Direction::North);
         assert_eq!(point, Point::new(0, -1));
 
-        point = point.move_in(&East);
-        point = point.move_in(&East);
+        point = point.move_in(&Direction::East);
+        point = point.move_in(&Direction::East);
         assert_eq!(point, Point::new(2, -1));
 
-        point = point.move_in(&South);
-        point = point.move_in(&South);
+        point = point.move_in(&Direction::South);
+        point = point.move_in(&Direction::South);
         assert_eq!(point, Point::new(2, 1));
 
-        point = point.move_in(&West);
+        point = point.move_in(&Direction::West);
         assert_eq!(point, Point::new(1, 1));
     }
 
