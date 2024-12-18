@@ -16,22 +16,30 @@ impl LightGrid {
             Instruction::TurnOn(start, end) => {
                 let points = range_of(start..end);
                 points.for_each(|point| {
-                    self.grid.insert(point, Light::On);
+                    self.grid.entry(point).or_insert(Light::new()).on();
                 });
             }
             Instruction::TurnOff(start, end) => {
                 let points = range_of(start..end);
                 points.for_each(|point| {
-                    self.grid.insert(point, Light::Off);
+                    self.grid.entry(point).or_insert(Light::new()).off();
                 });
             }
             Instruction::Toggle(start, end) => {
                 let points = range_of(start..end);
                 points.for_each(|point| {
-                    let light = self.grid.entry(point).or_insert(Light::Off);
-                    *light = match light {
-                        Light::On => Light::Off,
-                        Light::Off => Light::On,
+                    let light = self.grid.entry(point).or_insert(Light::new());
+                    match light.state {
+                        LightState::On => {
+                            light.on();
+                            light.on();
+                            light.on();
+                            light.off();
+                        },
+                        LightState::Off => {
+                            light.on();
+                            light.on();
+                        },
                     };
                 });
             }
@@ -39,12 +47,44 @@ impl LightGrid {
     }
 
     fn lights_on(&self) -> usize {
-        self.grid.values().filter(|&light| light == &Light::On).count()
+        self.grid.values()
+            .filter(|&light| light.state == LightState::On)
+            .count()
+    }
+
+    fn total_brightness(&self) -> u64 {
+        self.grid.values()
+            .map(|light| light.brightness as u64)
+            .sum()
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Light {
+struct  Light {
+    state: LightState,
+    brightness: u32,
+}
+
+impl Light {
+    fn new() -> Self {
+        Light { state: LightState::Off, brightness: 0 }
+    }
+
+    fn on(&mut self) {
+        self.brightness += 1;
+        self.state = LightState::On;
+    }
+
+    fn off(&mut self) {
+        if self.brightness > 0 {
+            self.brightness -= 1;
+        }
+        self.state = LightState::Off;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum LightState {
     On,
     Off,
 }
@@ -114,6 +154,18 @@ mod tests {
     }
 
     #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_06/input.txt");
+
+        let mut light_grid = LightGrid::new();
+        input.lines()
+            .map(|line| Instruction::from_str(line).unwrap())
+            .for_each(|instruction| light_grid.toggle(instruction));
+
+        assert_eq!(light_grid.total_brightness(), 15343601);
+    }
+
+    #[test]
     fn test_on_instruction_parsing() {
         let input = "turn on 0,0 through 999,999";
 
@@ -138,5 +190,51 @@ mod tests {
         let instruction = Instruction::from_str(input).unwrap();
 
         assert_eq!(instruction, Instruction::Toggle(Point::new(0, 0), Point::new(999, 997)));
+    }
+
+    #[test]
+    fn test_switching_lights() {
+        let mut light_grid = LightGrid::new();
+
+        let turn_on = Instruction::TurnOn(Point::new(0, 0), Point::new(4, 4));
+        light_grid.toggle(turn_on);
+        assert_eq!(light_grid.lights_on(), 25);
+
+        let turn_off = Instruction::TurnOff(Point::new(0, 0), Point::new(2, 2));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.lights_on(), 16);
+
+        let turn_off = Instruction::Toggle(Point::new(3, 3), Point::new(4, 4));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.lights_on(), 12);
+
+        let turn_off = Instruction::Toggle(Point::new(1, 1), Point::new(2, 2));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.lights_on(), 16);
+    }
+
+    #[test]
+    fn test_tuning_brightness() {
+        let mut light_grid = LightGrid::new();
+
+        let turn_on = Instruction::TurnOn(Point::new(0, 0), Point::new(4, 4));
+        light_grid.toggle(turn_on);
+        assert_eq!(light_grid.total_brightness(), 25);
+
+        let turn_on = Instruction::TurnOn(Point::new(0, 0), Point::new(4, 4));
+        light_grid.toggle(turn_on);
+        assert_eq!(light_grid.total_brightness(), 50);
+
+        let turn_off = Instruction::TurnOff(Point::new(0, 0), Point::new(2, 2));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.total_brightness(), 41);
+
+        let turn_off = Instruction::Toggle(Point::new(3, 3), Point::new(4, 4));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.total_brightness(), 49);
+
+        let turn_off = Instruction::Toggle(Point::new(1, 1), Point::new(2, 2));
+        light_grid.toggle(turn_off);
+        assert_eq!(light_grid.total_brightness(), 57);
     }
 }
