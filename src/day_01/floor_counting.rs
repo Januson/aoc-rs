@@ -1,4 +1,4 @@
-use crate::utils::frequencies::frequencies;
+use crate::utils::frequencies::{frequencies, Frequencies};
 
 struct Directions(String);
 
@@ -8,7 +8,7 @@ impl Directions {
     }
 
     fn final_floor(&self) -> i32 {
-        let frequencies = frequencies(&self.0);
+        let frequencies: Frequencies<char> = frequencies(self.0.chars());
         let up = frequencies.get('(');
         let down = frequencies.get(')');
 

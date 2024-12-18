@@ -1,10 +1,10 @@
 use std::str::FromStr;
-use crate::utils::frequencies::frequencies;
+use crate::utils::frequencies::{frequencies, Frequencies};
 use crate::utils::partition::partition;
 
 fn contains_vowels(s: &str, n: u32) -> bool {
     let vowels = ['a', 'e', 'i', 'o', 'u'];
-    let frequencies = frequencies(s);
+    let frequencies: Frequencies<char> = frequencies(s.chars());
 
     let total_vowels: u32 = vowels.iter()
         .map(|vowel| frequencies.get(*vowel))
@@ -16,8 +16,39 @@ fn contains_vowels(s: &str, n: u32) -> bool {
 fn contains_repeated_letter(s: &str, n: u32) -> bool {
     let chars: Vec<_> = s.chars().collect();
     let found_repeated_char = partition(&chars, n as usize, 1).into_iter()
-        .map(|pair| pair[0] == pair[1])
-        .any(|x| x);
+        .any(|pair| pair[0] == pair[1]);
+
+    found_repeated_char
+}
+
+fn contains_repeated_pair(s: &str) -> bool {
+    let chars: Vec<_> = s.chars().collect();
+
+    let partitions: Vec<_> = partition(&chars, 2, 1).into_iter()
+        .map(|pair| pair.iter().collect::<String>())
+        .collect();
+
+    let mut filtered = Vec::new();
+    let mut seen = None;
+    for x in partitions.iter() {
+        if Some(x) == seen {
+            seen = None;
+            continue;
+        } else {
+            seen = Some(x);
+        }
+        filtered.push(x);
+    }
+
+    frequencies(filtered).into_iter()
+        .filter(|(_, count)| count >= &2)
+        .count() > 0
+}
+
+fn contains_repeated_letter_with_gap(s: &str) -> bool {
+    let chars: Vec<_> = s.chars().collect();
+    let found_repeated_char = partition(&chars, 3, 1).into_iter()
+        .any(|items| items[0] == items[2]);
 
     found_repeated_char
 }
@@ -54,6 +85,14 @@ impl NaughtyList {
             .map(|name| name.as_str())
             .collect()
     }
+
+    fn nice_updated(&self) -> Vec<&str> {
+        self.names.iter()
+            .filter(|name| contains_repeated_pair(name))
+            .filter(|name| contains_repeated_letter_with_gap(name))
+            .map(|name| name.as_str())
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -67,6 +106,15 @@ mod tests {
         let naughty_list = NaughtyList::from_str(input).unwrap();
 
         assert_eq!(naughty_list.nice().len(), 255);
+    }
+
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_05/input.txt");
+
+        let naughty_list = NaughtyList::from_str(input).unwrap();
+
+        assert_eq!(naughty_list.nice_updated().len(), 55);
     }
 
     #[test]
@@ -94,6 +142,23 @@ mod tests {
     }
 
     #[test]
+    fn test_contains_repeated_pair() {
+        assert!(contains_repeated_pair("xxxx"));
+        assert!(contains_repeated_pair("abcddeab"));
+        assert!(contains_repeated_pair("xxaxx"));
+
+        assert!(!contains_repeated_pair("xxx"));
+    }
+
+    #[test]
+    fn test_contains_repeated_letter_with_gap() {
+        assert!(contains_repeated_letter_with_gap("xyx"));
+        assert!(contains_repeated_letter_with_gap("abcdce"));
+        assert!(contains_repeated_letter_with_gap("aabbccdc"));
+        assert!(!contains_repeated_letter_with_gap("aabbccdd"));
+    }
+
+    #[test]
     fn test_nice_detection() {
         let strings = vec![
             "ugknbfddgicrmopn".to_string(),
@@ -106,5 +171,19 @@ mod tests {
         let naughty_list = NaughtyList { names: strings };
 
         assert_eq!(naughty_list.nice(), vec!["ugknbfddgicrmopn", "aaa"]);
+    }
+
+    #[test]
+    fn test_updated_nice_detection() {
+        let strings = vec![
+            "qjhvhtzxzqqjkmpb".to_string(),
+            "xxyxx".to_string(),
+            "uurcxstgmygtbstg".to_string(),
+            "ieodomkazucvgmuy".to_string(),
+        ];
+
+        let naughty_list = NaughtyList { names: strings };
+
+        assert_eq!(naughty_list.nice_updated(), vec!["qjhvhtzxzqqjkmpb", "xxyxx"]);
     }
 }
