@@ -202,6 +202,22 @@ mod tests {
         assert_eq!(bobby_tables.signal_on(Wire::new("a")), 3176);
     }
 
+    #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_07/input.txt");
+
+        let circuit = Circuit::from_str(input).unwrap();
+        let mut bobby_tables = BobbyTables::new(circuit);
+        let signal_a = bobby_tables.signal_on(Wire::new("a"));
+
+        let mut circuit = Circuit::from_str(input).unwrap();
+        let connection = Connection::new(LogicGate::Input(format!("{}", signal_a)), Wire::new("b"));
+        circuit.connections.insert(Wire::new("b"), connection);
+
+        let mut bobby_tables = BobbyTables::new(circuit);
+        assert_eq!(bobby_tables.signal_on(Wire::new("a")), 14710);
+    }
+
     static SAMPLE: &str = "\
         123 -> x\n\
         456 -> y\n\
