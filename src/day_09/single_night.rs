@@ -76,6 +76,22 @@ impl Locations {
 
         shortest
     }
+
+    fn longest_path(&self) -> u32 {
+        let cities: Vec<_> = self.locations.keys().cloned().collect();
+        let permutations = permutations(cities);
+        let mut longest = 0;
+        for route in permutations {
+            let distance = route.windows(2).map(|pair| {
+                self.locations[&pair[0]][&pair[1]]
+            }).sum();
+            if distance > longest {
+                longest = distance;
+            }
+        }
+
+        longest
+    }
 }
 
 #[cfg(test)]
@@ -98,6 +114,15 @@ mod tests {
     }
 
     #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_09/input.txt");
+
+        let locations: Locations = Locations::from_str(input).unwrap();
+
+        assert_eq!(locations.longest_path(), 909);
+    }
+
+    #[test]
     fn parsing() {
         let input = EXAMPLE;
 
@@ -111,6 +136,13 @@ mod tests {
         let locations = Locations::from_str(EXAMPLE).unwrap();
 
         assert_eq!(locations.shortest_path(), 605);
+    }
+
+    #[test]
+    fn test_longest_path() {
+        let locations = Locations::from_str(EXAMPLE).unwrap();
+
+        assert_eq!(locations.longest_path(), 982);
     }
 
     #[test]
