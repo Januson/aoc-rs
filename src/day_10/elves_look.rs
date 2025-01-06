@@ -38,6 +38,18 @@ mod tests {
     }
 
     #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_10/input.txt");
+
+        let mut result = input.trim().to_string();
+        for _ in 0..50 {
+            result = look_and_say(&result);
+        }
+
+        assert_eq!(format!("{}", result).len(), 3579328);
+    }
+
+    #[test]
     fn test_numbers() {
         assert_eq!(look_and_say("1"), "11");
         assert_eq!(look_and_say("11"), "21");
