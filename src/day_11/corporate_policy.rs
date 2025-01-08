@@ -88,6 +88,15 @@ mod tests {
     }
 
     #[test]
+    fn solution_2() {
+        let input = include_str!("../../input/year_2015/day_11/input.txt");
+
+        let mut password = Password::new(input);
+
+        assert_eq!(password.next().next().to_string(), "heqaabcc");
+    }
+
+    #[test]
     fn test_incrementing() {
         let mut password = Password::new("azy");
 
