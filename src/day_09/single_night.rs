@@ -35,9 +35,9 @@ impl FromStr for Locations {
     }
 }
 
-fn permutations<T: Clone>(items: Vec<T>) -> Vec<Vec<T>>
+fn permutations<T>(items: Vec<T>) -> Vec<Vec<T>>
 where
-    T: Ord,
+    T: Clone + Ord,
 {
     if items.len() == 1 {
         vec![items]
